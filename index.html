@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sizan Pharmacy Manager</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div id="login-screen" class="login-screen">
+      <section class="login-panel">
+        <div class="brand-lockup">
+          <div class="brand-mark">Rx</div>
+          <div>
+            <p class="eyebrow">Pharmacy operations</p>
+            <h1>Sizan Pharmacy Manager</h1>
+          </div>
+        </div>
+        <p class="login-copy">Manage medicines, batches, purchases, sales, suppliers, customers, alerts, invoices, and reports from one mobile-friendly workspace.</p>
+        <form id="login-form" class="login-form">
+          <label>
+            User role
+            <select id="login-role">
+              <option value="admin">Admin</option>
+              <option value="staff">Staff</option>
+            </select>
+          </label>
+          <label>
+            PIN
+            <input id="login-pin" type="password" inputmode="numeric" placeholder="Admin: 1234, Staff: 0000" required>
+          </label>
+          <button class="primary-button" type="submit">Sign in</button>
+          <p id="login-error" class="form-error" aria-live="polite"></p>
+        </form>
+      </section>
+    </div>
+
+    <div id="app-shell" class="app-shell hidden">
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="brand-mark">Rx</div>
+          <div>
+            <strong>Sizan Pharmacy</strong>
+            <span id="current-role">Admin</span>
+          </div>
+        </div>
+        <nav id="main-nav" class="main-nav" aria-label="Main sections">
+          <button data-view="dashboard" class="active">Dashboard</button>
+          <button data-view="medicines">Medicines</button>
+          <button data-view="masters">Categories & Companies</button>
+          <button data-view="purchases">Purchases</button>
+          <button data-view="sales">Sales & Invoice</button>
+          <button data-view="stock">Stock & Batches</button>
+          <button data-view="people">Suppliers & Customers</button>
+          <button data-view="reports">Reports</button>
+          <button data-view="backup">Backup</button>
+        </nav>
+        <button id="logout-button" class="ghost-button">Sign out</button>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Today</p>
+            <h2 id="view-title">Dashboard</h2>
+          </div>
+          <div class="topbar-actions">
+            <label class="search-box">
+              <span>Search</span>
+              <input id="global-search" type="search" placeholder="Name, company, barcode">
+            </label>
+            <button id="print-button" class="icon-button" title="Print current view">Print</button>
+          </div>
+        </header>
+
+        <section id="dashboard-view" class="view active-view">
+          <div class="metric-grid" id="metric-grid"></div>
+          <div class="dashboard-grid">
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Alerts</h3>
+                <span id="alert-count" class="badge">0</span>
+              </div>
+              <div id="alert-list" class="alert-list"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Sales Trend</h3>
+                <span class="muted">Last 7 days</span>
+              </div>
+              <div id="sales-chart" class="bar-chart"></div>
+            </section>
+          </div>
+          <section class="panel">
+            <div class="panel-header">
+              <h3>Fast Medicine Search</h3>
+              <span class="muted">Use name, company, or barcode</span>
+            </div>
+            <div id="quick-results" class="table-wrap"></div>
+          </section>
+        </section>
+
+        <section id="medicines-view" class="view">
+          <div class="two-column">
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Medicine Add / Edit</h3>
+                <span class="muted">Admin only for delete</span>
+              </div>
+              <form id="medicine-form" class="form-grid"></form>
+            </section>
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Medicine List</h3>
+                <span id="medicine-count" class="badge">0</span>
+              </div>
+              <div id="medicine-table" class="table-wrap"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="masters-view" class="view">
+          <div class="two-column">
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Medicine Categories</h3>
+                <span class="muted">Add, edit, delete</span>
+              </div>
+              <form id="category-form" class="inline-form"></form>
+              <div id="category-table" class="table-wrap"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Companies</h3>
+                <span class="muted">Manufacturer management</span>
+              </div>
+              <form id="company-form" class="inline-form"></form>
+              <div id="company-table" class="table-wrap"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="purchases-view" class="view">
+          <div class="two-column">
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Purchase Entry</h3>
+                <span class="muted">Creates or updates stock batch</span>
+              </div>
+              <form id="purchase-form" class="form-grid"></form>
+            </section>
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Purchase History</h3>
+                <span id="purchase-total" class="badge">0</span>
+              </div>
+              <div id="purchase-table" class="table-wrap"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="sales-view" class="view">
+          <div class="two-column">
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Sales Entry</h3>
+                <span class="muted">FIFO by expiry date</span>
+              </div>
+              <form id="sale-form" class="form-grid"></form>
+              <div id="last-invoice" class="invoice-preview"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Sales History</h3>
+                <span id="sales-total" class="badge">0</span>
+              </div>
+              <div id="sales-table" class="table-wrap"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="stock-view" class="view">
+          <div class="panel">
+            <div class="panel-header">
+              <h3>Current Stock, Batch & Expiry</h3>
+              <span class="muted">Low stock and expiry alerts are calculated automatically</span>
+            </div>
+            <div id="stock-table" class="table-wrap"></div>
+          </div>
+        </section>
+
+        <section id="people-view" class="view">
+          <div class="two-column">
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Supplier Management</h3>
+                <span class="muted">Purchasing contacts</span>
+              </div>
+              <form id="supplier-form" class="form-grid compact"></form>
+              <div id="supplier-table" class="table-wrap"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Customer Management</h3>
+                <span class="muted">Due tracking</span>
+              </div>
+              <form id="customer-form" class="form-grid compact"></form>
+              <div id="customer-table" class="table-wrap"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="reports-view" class="view">
+          <div class="report-controls">
+            <label>
+              Report month
+              <input id="report-month" type="month">
+            </label>
+            <button id="refresh-reports" class="secondary-button">Refresh reports</button>
+          </div>
+          <div class="metric-grid" id="report-metrics"></div>
+          <div class="two-column">
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Sales Report</h3>
+                <span class="muted">Daily and monthly</span>
+              </div>
+              <div id="daily-report" class="table-wrap"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Purchase & Profit/Loss Report</h3>
+                <span class="muted">Margin based on batch cost</span>
+              </div>
+              <div id="profit-report" class="table-wrap"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="backup-view" class="view">
+          <div class="two-column">
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Data Backup</h3>
+                <span class="muted">Export JSON</span>
+              </div>
+              <p class="panel-copy">Download a full snapshot of medicines, stock batches, suppliers, customers, purchases, sales, and settings.</p>
+              <button id="export-backup" class="primary-button">Download backup</button>
+            </section>
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Restore Backup</h3>
+                <span class="muted">Admin only</span>
+              </div>
+              <p class="panel-copy">Restore a previously exported JSON backup. This replaces the browser's current local data.</p>
+              <input id="restore-file" type="file" accept="application/json">
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <template id="empty-state-template">
+      <div class="empty-state">
+        <strong>No records yet</strong>
+        <span>Add an entry to see it here.</span>
+      </div>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
