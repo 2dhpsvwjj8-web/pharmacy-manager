@@ -1,10 +1,9 @@
-const STORAGE_KEY = "sizan-pharmacy-v1";
-const ADMIN_PIN = "1234";
-const STAFF_PIN = "0000";
+const SUPABASE_URL = "https://lplrefgpyjnrgpqmrnwv.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Qso0T-HLfVo21pNLIeRY1w_-HX8TGLQ";
+const LOCAL_FALLBACK_KEY = "pharmacy-manager-local-fallback-v2";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
-const uid = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const addDays = (days) => {
   const date = new Date();
@@ -15,8 +14,23 @@ const money = (amount) => `BDT ${Number(amount || 0).toFixed(2)}`;
 const number = (value) => Number(value || 0);
 const byName = (a, b) => a.name.localeCompare(b.name);
 
-let db = loadData();
+const emptyData = () => ({
+  categories: [],
+  companies: [],
+  suppliers: [],
+  customers: [],
+  medicines: [],
+  batches: [],
+  purchases: [],
+  sales: [],
+});
+
+const supabaseClient = window.supabase?.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+let db = emptyData();
 let currentUser = null;
+let currentProfile = null;
+let usingLocalFallback = false;
 let editing = {
   medicine: null,
   category: null,
@@ -26,170 +40,188 @@ let editing = {
 };
 
 function seedData() {
-  const categories = [
-    { id: "cat-tablet", name: "Tablet" },
-    { id: "cat-syrup", name: "Syrup" },
-    { id: "cat-injection", name: "Injection" },
-  ];
-  const companies = [
-    { id: "com-square", name: "Square Pharmaceuticals" },
-    { id: "com-beximco", name: "Beximco Pharma" },
-    { id: "com-incepta", name: "Incepta" },
-  ];
-  const suppliers = [
-    { id: "sup-1", name: "Metro Medical Supply", phone: "01710000001", due: 2500, address: "Dhaka" },
-    { id: "sup-2", name: "Central Pharma Depot", phone: "01710000002", due: 0, address: "Chattogram" },
-  ];
-  const customers = [
-    { id: "cus-1", name: "Walk-in Customer", phone: "", due: 0, address: "" },
-    { id: "cus-2", name: "Rahim Ahmed", phone: "01810000003", due: 420, address: "Mirpur" },
-  ];
-  const medicines = [
-    {
-      id: "med-napa",
-      name: "Napa 500",
-      generic: "Paracetamol",
-      categoryId: "cat-tablet",
-      companyId: "com-beximco",
-      barcode: "8941100010010",
-      lowStock: 60,
-      salePrice: 1.8,
-    },
-    {
-      id: "med-seclo",
-      name: "Seclo 20",
-      generic: "Omeprazole",
-      categoryId: "cat-tablet",
-      companyId: "com-square",
-      barcode: "8941100010027",
-      lowStock: 40,
-      salePrice: 6,
-    },
-    {
-      id: "med-napa-syrup",
-      name: "Napa Syrup",
-      generic: "Paracetamol",
-      categoryId: "cat-syrup",
-      companyId: "com-beximco",
-      barcode: "8941100010034",
-      lowStock: 20,
-      salePrice: 35,
-    },
-  ];
-  const batches = [
-    {
-      id: "bat-1",
-      medicineId: "med-napa",
-      batchNo: "NP2401",
-      expiryDate: addDays(75),
-      quantity: 180,
-      purchasePrice: 1.12,
-      salePrice: 1.8,
-      supplierId: "sup-1",
-      purchaseId: "pur-1",
-    },
-    {
-      id: "bat-2",
-      medicineId: "med-seclo",
-      batchNo: "SC2309",
-      expiryDate: addDays(25),
-      quantity: 35,
-      purchasePrice: 3.7,
-      salePrice: 6,
-      supplierId: "sup-2",
-      purchaseId: "pur-2",
-    },
-    {
-      id: "bat-3",
-      medicineId: "med-napa-syrup",
-      batchNo: "NS2306",
-      expiryDate: addDays(12),
-      quantity: 18,
-      purchasePrice: 23,
-      salePrice: 35,
-      supplierId: "sup-1",
-      purchaseId: "pur-3",
-    },
-  ];
-  const purchases = [
-    {
-      id: "pur-1",
-      date: addDays(-12),
-      supplierId: "sup-1",
-      medicineId: "med-napa",
-      batchNo: "NP2401",
-      expiryDate: addDays(75),
-      quantity: 200,
-      purchasePrice: 1.12,
-      salePrice: 1.8,
-      paid: 224,
-      total: 224,
-      due: 0,
-    },
-    {
-      id: "pur-2",
-      date: addDays(-8),
-      supplierId: "sup-2",
-      medicineId: "med-seclo",
-      batchNo: "SC2309",
-      expiryDate: addDays(25),
-      quantity: 50,
-      purchasePrice: 3.7,
-      salePrice: 6,
-      paid: 185,
-      total: 185,
-      due: 0,
-    },
-    {
-      id: "pur-3",
-      date: addDays(-3),
-      supplierId: "sup-1",
-      medicineId: "med-napa-syrup",
-      batchNo: "NS2306",
-      expiryDate: addDays(12),
-      quantity: 24,
-      purchasePrice: 23,
-      salePrice: 35,
-      paid: 300,
-      total: 552,
-      due: 252,
-    },
-  ];
-  const sales = [
-    {
-      id: "sal-1",
-      invoiceNo: "INV-1001",
-      date: addDays(-2),
-      customerId: "cus-1",
-      medicineId: "med-napa",
-      batchNo: "NP2401",
-      quantity: 20,
-      salePrice: 1.8,
-      total: 36,
-      paid: 36,
-      due: 0,
-      costTotal: 22.4,
-    },
-    {
-      id: "sal-2",
-      invoiceNo: "INV-1002",
-      date: addDays(-1),
-      customerId: "cus-2",
-      medicineId: "med-seclo",
-      batchNo: "SC2309",
-      quantity: 15,
-      salePrice: 6,
-      total: 90,
-      paid: 50,
-      due: 40,
-      costTotal: 55.5,
-    },
-  ];
-  return { categories, companies, suppliers, customers, medicines, batches, purchases, sales };
+  return {
+    categories: [
+      { id: "cat-tablet", name: "Tablet" },
+      { id: "cat-syrup", name: "Syrup" },
+      { id: "cat-injection", name: "Injection" },
+    ],
+    companies: [
+      { id: "com-square", name: "Square Pharmaceuticals" },
+      { id: "com-beximco", name: "Beximco Pharma" },
+      { id: "com-incepta", name: "Incepta" },
+    ],
+    suppliers: [
+      { id: "sup-1", name: "Metro Medical Supply", phone: "01710000001", due: 2500, address: "Dhaka" },
+      { id: "sup-2", name: "Central Pharma Depot", phone: "01710000002", due: 0, address: "Chattogram" },
+    ],
+    customers: [
+      { id: "cus-1", name: "Walk-in Customer", phone: "", due: 0, address: "" },
+      { id: "cus-2", name: "Rahim Ahmed", phone: "01810000003", due: 420, address: "Mirpur" },
+    ],
+    medicines: [
+      {
+        id: "med-napa",
+        name: "Napa 500",
+        generic: "Paracetamol",
+        categoryId: "cat-tablet",
+        companyId: "com-beximco",
+        barcode: "8941100010010",
+        lowStock: 60,
+        salePrice: 1.8,
+      },
+      {
+        id: "med-seclo",
+        name: "Seclo 20",
+        generic: "Omeprazole",
+        categoryId: "cat-tablet",
+        companyId: "com-square",
+        barcode: "8941100010027",
+        lowStock: 40,
+        salePrice: 6,
+      },
+    ],
+    batches: [
+      {
+        id: "bat-1",
+        medicineId: "med-napa",
+        batchNo: "NP2401",
+        expiryDate: addDays(75),
+        quantity: 180,
+        purchasePrice: 1.12,
+        salePrice: 1.8,
+        supplierId: "sup-1",
+      },
+      {
+        id: "bat-2",
+        medicineId: "med-seclo",
+        batchNo: "SC2309",
+        expiryDate: addDays(25),
+        quantity: 35,
+        purchasePrice: 3.7,
+        salePrice: 6,
+        supplierId: "sup-2",
+      },
+    ],
+    purchases: [],
+    sales: [],
+  };
 }
 
-function loadData() {
-  const saved = localStorage.getItem(STORAGE_KEY);
+function mapMedicine(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    generic: row.generic || "",
+    categoryId: row.category_id,
+    companyId: row.company_id,
+    barcode: row.barcode || "",
+    lowStock: number(row.low_stock),
+    salePrice: number(row.sale_price),
+  };
+}
+
+function toMedicineRow(item) {
+  return {
+    name: item.name,
+    generic: item.generic || null,
+    category_id: item.categoryId || null,
+    company_id: item.companyId || null,
+    barcode: item.barcode || null,
+    low_stock: item.lowStock,
+    sale_price: item.salePrice,
+  };
+}
+
+function mapBatch(row) {
+  return {
+    id: row.id,
+    medicineId: row.medicine_id,
+    supplierId: row.supplier_id,
+    batchNo: row.batch_no,
+    expiryDate: row.expiry_date,
+    quantity: number(row.quantity),
+    purchasePrice: number(row.purchase_price),
+    salePrice: number(row.sale_price),
+  };
+}
+
+function toBatchRow(item) {
+  return {
+    medicine_id: item.medicineId,
+    supplier_id: item.supplierId || null,
+    batch_no: item.batchNo,
+    expiry_date: item.expiryDate,
+    quantity: item.quantity,
+    purchase_price: item.purchasePrice,
+    sale_price: item.salePrice,
+  };
+}
+
+function mapPurchase(row) {
+  return {
+    id: row.id,
+    supplierId: row.supplier_id,
+    medicineId: row.medicine_id,
+    batchId: row.batch_id,
+    quantity: number(row.quantity),
+    purchasePrice: number(row.purchase_price),
+    total: number(row.total),
+    paid: number(row.paid),
+    due: number(row.due),
+    date: row.purchase_date,
+  };
+}
+
+function mapSale(row) {
+  return {
+    id: row.id,
+    invoiceNo: row.invoice_no,
+    customerId: row.customer_id,
+    medicineId: row.medicine_id,
+    batchId: row.batch_id,
+    quantity: number(row.quantity),
+    salePrice: number(row.sale_price),
+    total: number(row.total),
+    paid: number(row.paid),
+    due: number(row.due),
+    costTotal: number(row.cost_total),
+    date: row.sale_date,
+  };
+}
+
+async function expectSupabase(query, message) {
+  const { data, error } = await query;
+  if (error) throw new Error(`${message}: ${error.message}`);
+  return data;
+}
+
+async function loadRemoteData() {
+  const [categories, companies, suppliers, customers, medicines, batches, purchases, sales] = await Promise.all([
+    expectSupabase(supabaseClient.from("categories").select("*").order("name"), "Could not load categories"),
+    expectSupabase(supabaseClient.from("companies").select("*").order("name"), "Could not load companies"),
+    expectSupabase(supabaseClient.from("suppliers").select("*").order("name"), "Could not load suppliers"),
+    expectSupabase(supabaseClient.from("customers").select("*").order("name"), "Could not load customers"),
+    expectSupabase(supabaseClient.from("medicines").select("*").order("name"), "Could not load medicines"),
+    expectSupabase(supabaseClient.from("batches").select("*").order("expiry_date"), "Could not load batches"),
+    expectSupabase(supabaseClient.from("purchases").select("*").order("purchase_date", { ascending: false }), "Could not load purchases"),
+    expectSupabase(supabaseClient.from("sales").select("*").order("sale_date", { ascending: false }), "Could not load sales"),
+  ]);
+
+  db = {
+    categories,
+    companies,
+    suppliers: suppliers.map((row) => ({ ...row, due: number(row.due) })),
+    customers: customers.map((row) => ({ ...row, due: number(row.due) })),
+    medicines: medicines.map(mapMedicine),
+    batches: batches.map(mapBatch),
+    purchases: purchases.map(mapPurchase),
+    sales: sales.map(mapSale),
+  };
+}
+
+function loadLocalData() {
+  const saved = localStorage.getItem(LOCAL_FALLBACK_KEY);
   if (!saved) return seedData();
   try {
     return JSON.parse(saved);
@@ -198,12 +230,12 @@ function loadData() {
   }
 }
 
-function saveData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+function saveLocalData() {
+  localStorage.setItem(LOCAL_FALLBACK_KEY, JSON.stringify(db));
 }
 
 function requireAdmin() {
-  if (currentUser !== "admin") {
+  if (currentProfile?.role !== "admin") {
     alert("Admin role is required for this action.");
     return false;
   }
@@ -228,6 +260,15 @@ function getCustomer(id) {
 
 function getMedicine(id) {
   return db.medicines.find((item) => item.id === id);
+}
+
+function getBatch(id) {
+  return db.batches.find((item) => item.id === id);
+}
+
+function batchLabel(id) {
+  const batch = getBatch(id);
+  return batch ? batch.batchNo : "-";
 }
 
 function stockFor(medicineId) {
@@ -282,6 +323,7 @@ function currentSearch() {
 }
 
 function medicineMatches(medicine, term = currentSearch()) {
+  if (!medicine) return false;
   if (!term) return true;
   return [medicine.name, medicine.generic, medicine.barcode, getCompany(medicine.companyId), getCategory(medicine.categoryId)]
     .join(" ")
@@ -311,14 +353,13 @@ function showView(viewName) {
 
 function renderMetrics() {
   const totalSales = db.sales.reduce((sum, sale) => sum + number(sale.total), 0);
-  const totalDue = db.sales.reduce((sum, sale) => sum + number(sale.due), 0) + db.purchases.reduce((sum, purchase) => sum + number(purchase.due), 0);
   const stockValue = db.batches.reduce((sum, batch) => sum + number(batch.quantity) * number(batch.purchasePrice), 0);
   const expiring = db.batches.filter((batch) => expiryStatus(batch.expiryDate).days <= 30).length;
   const metrics = [
     { label: "Total sales", value: money(totalSales), note: `${db.sales.length} invoices` },
     { label: "Current stock value", value: money(stockValue), note: `${db.batches.length} active batches` },
     { label: "Expiry alerts", value: expiring, note: "Within 30 days or expired" },
-    { label: "Total due", value: money(totalDue), note: "Sales + purchase due" },
+    { label: "Data source", value: usingLocalFallback ? "Local" : "Live", note: usingLocalFallback ? "Browser fallback" : "Supabase database" },
   ];
   $("#metric-grid").innerHTML = metrics
     .map((metric) => `<article class="metric-card"><span>${metric.label}</span><strong>${metric.value}</strong><small>${metric.note}</small></article>`)
@@ -528,7 +569,7 @@ function renderPurchases() {
       { label: "Date", render: (p) => formatDate(p.date) },
       { label: "Supplier", render: (p) => escapeHtml(getSupplier(p.supplierId)) },
       { label: "Medicine", render: (p) => escapeHtml(getMedicine(p.medicineId)?.name || "-") },
-      { label: "Batch", render: (p) => escapeHtml(p.batchNo) },
+      { label: "Batch", render: (p) => escapeHtml(batchLabel(p.batchId)) },
       { label: "Qty", render: (p) => p.quantity },
       { label: "Total", render: (p) => money(p.total) },
       { label: "Due", render: (p) => money(p.due) },
@@ -540,7 +581,7 @@ function renderPurchases() {
 function renderSaleForm() {
   $("#sale-form").innerHTML = `
     <label>Date<input name="date" type="date" required value="${todayISO()}"></label>
-    <label>Customer<select name="customerId" required>${options(db.customers, "cus-1", "Select customer")}</select></label>
+    <label>Customer<select name="customerId" required>${options(db.customers, "", "Select customer")}</select></label>
     <label class="full">Barcode search<input id="sale-barcode" placeholder="Scan or type barcode, then press Lookup"></label>
     <label>Medicine<select name="medicineId" required>${options(db.medicines, "", "Select medicine")}</select></label>
     <label>Quantity<input name="quantity" type="number" min="1" required></label>
@@ -565,7 +606,7 @@ function renderSales() {
       { label: "Date", render: (s) => formatDate(s.date) },
       { label: "Customer", render: (s) => escapeHtml(getCustomer(s.customerId)) },
       { label: "Medicine", render: (s) => escapeHtml(getMedicine(s.medicineId)?.name || "-") },
-      { label: "Batch", render: (s) => escapeHtml(s.batchNo) },
+      { label: "Batch", render: (s) => escapeHtml(batchLabel(s.batchId)) },
       { label: "Qty", render: (s) => s.quantity },
       { label: "Total", render: (s) => money(s.total) },
       { label: "Due", render: (s) => money(s.due) },
@@ -618,16 +659,8 @@ function personFields(person, buttonLabel) {
 
 function renderPeople() {
   renderPeopleForms();
-  renderTable(
-    "#supplier-table",
-    personColumns("supplier"),
-    db.suppliers.slice().sort(byName)
-  );
-  renderTable(
-    "#customer-table",
-    personColumns("customer"),
-    db.customers.slice().sort(byName)
-  );
+  renderTable("#supplier-table", personColumns("supplier"), db.suppliers.slice().sort(byName));
+  renderTable("#customer-table", personColumns("customer"), db.customers.slice().sort(byName));
 }
 
 function personColumns(type) {
@@ -724,49 +757,81 @@ function formObject(form) {
   return Object.fromEntries(new FormData(form).entries());
 }
 
-function upsertNamed(collection, editKey, prefix, form) {
-  const data = formObject(form);
-  if (editing[editKey]) {
-    const item = db[collection].find((row) => row.id === editing[editKey]);
-    item.name = data.name.trim();
-    editing[editKey] = null;
+async function refreshAfterWrite() {
+  if (usingLocalFallback) {
+    saveLocalData();
   } else {
-    db[collection].push({ id: uid(prefix), name: data.name.trim() });
+    await loadRemoteData();
   }
-  saveData();
   renderAll();
 }
 
-function upsertPerson(collection, editKey, prefix, form) {
+async function upsertNamed(collection, table, editKey, prefix, form) {
+  const data = formObject(form);
+  const name = data.name.trim();
+  if (!name) return;
+  if (usingLocalFallback) {
+    if (editing[editKey]) {
+      db[collection].find((row) => row.id === editing[editKey]).name = name;
+      editing[editKey] = null;
+    } else {
+      db[collection].push({ id: `${prefix}-${Date.now()}`, name });
+    }
+    await refreshAfterWrite();
+    return;
+  }
+  if (editing[editKey]) {
+    await expectSupabase(supabaseClient.from(table).update({ name }).eq("id", editing[editKey]).select().single(), `Could not update ${editKey}`);
+    editing[editKey] = null;
+  } else {
+    await expectSupabase(supabaseClient.from(table).insert({ name }).select().single(), `Could not add ${editKey}`);
+  }
+  await refreshAfterWrite();
+}
+
+async function upsertPerson(collection, table, editKey, prefix, form) {
   const data = formObject(form);
   const person = {
     name: data.name.trim(),
-    phone: data.phone.trim(),
+    phone: data.phone.trim() || null,
     due: number(data.due),
-    address: data.address.trim(),
+    address: data.address.trim() || null,
   };
+  if (usingLocalFallback) {
+    if (editing[editKey]) {
+      Object.assign(db[collection].find((row) => row.id === editing[editKey]), person);
+      editing[editKey] = null;
+    } else {
+      db[collection].push({ id: `${prefix}-${Date.now()}`, ...person });
+    }
+    await refreshAfterWrite();
+    return;
+  }
   if (editing[editKey]) {
-    Object.assign(db[collection].find((row) => row.id === editing[editKey]), person);
+    await expectSupabase(supabaseClient.from(table).update(person).eq("id", editing[editKey]).select().single(), `Could not update ${editKey}`);
     editing[editKey] = null;
   } else {
-    db[collection].push({ id: uid(prefix), ...person });
+    await expectSupabase(supabaseClient.from(table).insert(person).select().single(), `Could not add ${editKey}`);
   }
-  saveData();
-  renderAll();
+  await refreshAfterWrite();
 }
 
-function deleteFrom(collection, id, usageCheck) {
+async function deleteFrom(collection, table, id, usageCheck) {
   if (!requireAdmin()) return;
   if (usageCheck()) {
     alert("This item is already used in records, so it cannot be deleted.");
     return;
   }
-  db[collection] = db[collection].filter((item) => item.id !== id);
-  saveData();
-  renderAll();
+  if (usingLocalFallback) {
+    db[collection] = db[collection].filter((item) => item.id !== id);
+    await refreshAfterWrite();
+    return;
+  }
+  await expectSupabase(supabaseClient.from(table).delete().eq("id", id), `Could not delete from ${table}`);
+  await refreshAfterWrite();
 }
 
-function handleMedicineSubmit(event) {
+async function handleMedicineSubmit(event) {
   event.preventDefault();
   const data = formObject(event.currentTarget);
   const medicine = {
@@ -778,17 +843,26 @@ function handleMedicineSubmit(event) {
     lowStock: number(data.lowStock),
     salePrice: number(data.salePrice),
   };
+  if (usingLocalFallback) {
+    if (editing.medicine) {
+      Object.assign(getMedicine(editing.medicine), medicine);
+      editing.medicine = null;
+    } else {
+      db.medicines.push({ id: `med-${Date.now()}`, ...medicine });
+    }
+    await refreshAfterWrite();
+    return;
+  }
   if (editing.medicine) {
-    Object.assign(getMedicine(editing.medicine), medicine);
+    await expectSupabase(supabaseClient.from("medicines").update(toMedicineRow(medicine)).eq("id", editing.medicine).select().single(), "Could not update medicine");
     editing.medicine = null;
   } else {
-    db.medicines.push({ id: uid("med"), ...medicine });
+    await expectSupabase(supabaseClient.from("medicines").insert(toMedicineRow(medicine)).select().single(), "Could not add medicine");
   }
-  saveData();
-  renderAll();
+  await refreshAfterWrite();
 }
 
-function handlePurchaseSubmit(event) {
+async function handlePurchaseSubmit(event) {
   event.preventDefault();
   const data = formObject(event.currentTarget);
   const quantity = number(data.quantity);
@@ -797,78 +871,76 @@ function handlePurchaseSubmit(event) {
   const total = quantity * purchasePrice;
   const paid = number(data.paid);
   const due = Math.max(0, total - paid);
-  const purchaseId = uid("pur");
-  db.purchases.push({
-    id: purchaseId,
-    date: data.date,
-    supplierId: data.supplierId,
+  const batchData = {
     medicineId: data.medicineId,
+    supplierId: data.supplierId,
     batchNo: data.batchNo.trim(),
     expiryDate: data.expiryDate,
     quantity,
     purchasePrice,
     salePrice,
-    paid,
-    total,
-    due,
-  });
-  const existingBatch = db.batches.find(
-    (batch) => batch.medicineId === data.medicineId && batch.batchNo.toLowerCase() === data.batchNo.trim().toLowerCase()
-  );
-  if (existingBatch) {
-    existingBatch.quantity += quantity;
-    existingBatch.expiryDate = data.expiryDate;
-    existingBatch.purchasePrice = purchasePrice;
-    existingBatch.salePrice = salePrice;
-    existingBatch.supplierId = data.supplierId;
-  } else {
-    db.batches.push({
-      id: uid("bat"),
+  };
+  if (usingLocalFallback) {
+    const batchId = `bat-${Date.now()}`;
+    db.batches.push({ id: batchId, ...batchData });
+    db.purchases.push({
+      id: `pur-${Date.now()}`,
+      date: data.date,
+      supplierId: data.supplierId,
       medicineId: data.medicineId,
-      batchNo: data.batchNo.trim(),
-      expiryDate: data.expiryDate,
+      batchId,
       quantity,
       purchasePrice,
-      salePrice,
-      supplierId: data.supplierId,
-      purchaseId,
+      total,
+      paid,
+      due,
     });
+    const supplier = db.suppliers.find((item) => item.id === data.supplierId);
+    if (supplier) supplier.due = number(supplier.due) + due;
+    event.currentTarget.reset();
+    await refreshAfterWrite();
+    return;
   }
+  const batch = await expectSupabase(supabaseClient.from("batches").insert(toBatchRow(batchData)).select().single(), "Could not create batch");
+  await expectSupabase(
+    supabaseClient
+      .from("purchases")
+      .insert({
+        supplier_id: data.supplierId,
+        medicine_id: data.medicineId,
+        batch_id: batch.id,
+        quantity,
+        purchase_price: purchasePrice,
+        total,
+        paid,
+        due,
+        purchase_date: data.date,
+      })
+      .select()
+      .single(),
+    "Could not save purchase"
+  );
   const supplier = db.suppliers.find((item) => item.id === data.supplierId);
-  if (supplier) supplier.due = number(supplier.due) + due;
-  saveData();
+  if (supplier) {
+    await expectSupabase(supabaseClient.from("suppliers").update({ due: number(supplier.due) + due }).eq("id", data.supplierId), "Could not update supplier due");
+  }
   event.currentTarget.reset();
-  renderAll();
+  await refreshAfterWrite();
 }
 
-function consumeStock(medicineId, quantity) {
-  let remaining = quantity;
-  let costTotal = 0;
-  const usedBatches = [];
-  const batches = db.batches
-    .filter((batch) => batch.medicineId === medicineId && batch.quantity > 0)
-    .sort((a, b) => a.expiryDate.localeCompare(b.expiryDate));
-  const available = batches.reduce((sum, batch) => sum + number(batch.quantity), 0);
-  if (available < quantity) {
-    return { ok: false, message: `Only ${available} units are available in stock.` };
-  }
-  for (const batch of batches) {
-    if (remaining <= 0) break;
-    const take = Math.min(batch.quantity, remaining);
-    batch.quantity -= take;
-    remaining -= take;
-    costTotal += take * number(batch.purchasePrice);
-    usedBatches.push(`${batch.batchNo} (${take})`);
-  }
-  return { ok: true, costTotal, batchNo: usedBatches.join(", ") };
+function findSaleBatch(medicineId, quantity) {
+  return (
+    db.batches
+      .filter((batch) => batch.medicineId === medicineId && batch.quantity >= quantity)
+      .sort((a, b) => a.expiryDate.localeCompare(b.expiryDate))[0] || null
+  );
 }
 
 function nextInvoiceNo() {
-  const next = db.sales.length + 1001;
-  return `INV-${next}`;
+  return `INV-${db.sales.length + 1001}`;
 }
 
-function handleSaleSubmit(event) {
+async function handleSaleSubmit(event) {
   event.preventDefault();
   const data = formObject(event.currentTarget);
   const quantity = number(data.quantity);
@@ -876,33 +948,62 @@ function handleSaleSubmit(event) {
   const total = quantity * salePrice;
   const paid = number(data.paid);
   const due = Math.max(0, total - paid);
-  const stock = consumeStock(data.medicineId, quantity);
-  if (!stock.ok) {
-    alert(stock.message);
+  const batch = findSaleBatch(data.medicineId, quantity);
+  if (!batch) {
+    alert("No single batch has enough stock for this sale. Use a smaller quantity or create separate sales.");
     return;
   }
   const sale = {
-    id: uid("sal"),
     invoiceNo: nextInvoiceNo(),
     date: data.date,
     customerId: data.customerId,
     medicineId: data.medicineId,
-    batchNo: stock.batchNo,
+    batchId: batch.id,
     quantity,
     salePrice,
     total,
     paid,
     due,
-    costTotal: stock.costTotal,
+    costTotal: quantity * number(batch.purchasePrice),
   };
-  db.sales.push(sale);
+  if (usingLocalFallback) {
+    batch.quantity -= quantity;
+    db.sales.push({ id: `sal-${Date.now()}`, ...sale });
+    const customer = db.customers.find((item) => item.id === data.customerId);
+    if (customer) customer.due = number(customer.due) + due;
+    event.currentTarget.reset();
+    await refreshAfterWrite();
+    $("#last-invoice").innerHTML = invoiceHtml(db.sales.at(-1));
+    return;
+  }
+  await expectSupabase(supabaseClient.from("batches").update({ quantity: batch.quantity - quantity }).eq("id", batch.id), "Could not update batch stock");
+  const savedSale = await expectSupabase(
+    supabaseClient
+      .from("sales")
+      .insert({
+        invoice_no: sale.invoiceNo,
+        customer_id: sale.customerId || null,
+        medicine_id: sale.medicineId,
+        batch_id: sale.batchId,
+        quantity: sale.quantity,
+        sale_price: sale.salePrice,
+        total: sale.total,
+        paid: sale.paid,
+        due: sale.due,
+        cost_total: sale.costTotal,
+        sale_date: sale.date,
+      })
+      .select()
+      .single(),
+    "Could not save sale"
+  );
   const customer = db.customers.find((item) => item.id === data.customerId);
-  if (customer) customer.due = number(customer.due) + due;
-  saveData();
+  if (customer) {
+    await expectSupabase(supabaseClient.from("customers").update({ due: number(customer.due) + due }).eq("id", data.customerId), "Could not update customer due");
+  }
   event.currentTarget.reset();
-  $("#last-invoice").innerHTML = invoiceHtml(sale);
-  renderAll();
-  $("#last-invoice").innerHTML = invoiceHtml(sale);
+  await refreshAfterWrite();
+  $("#last-invoice").innerHTML = invoiceHtml(mapSale(savedSale));
 }
 
 function invoiceHtml(sale) {
@@ -911,7 +1012,7 @@ function invoiceHtml(sale) {
     <article class="invoice">
       <div class="invoice-head">
         <div>
-          <strong>Sizan Pharmacy</strong><br>
+          <strong>Pharmacy Manager</strong><br>
           <span class="muted">Medicine sales invoice</span>
         </div>
         <div>
@@ -923,7 +1024,7 @@ function invoiceHtml(sale) {
         <tbody>
           <tr><th>Customer</th><td>${escapeHtml(getCustomer(sale.customerId))}</td></tr>
           <tr><th>Medicine</th><td>${escapeHtml(medicine?.name || "-")}</td></tr>
-          <tr><th>Batch</th><td>${escapeHtml(sale.batchNo)}</td></tr>
+          <tr><th>Batch</th><td>${escapeHtml(batchLabel(sale.batchId))}</td></tr>
           <tr><th>Quantity</th><td>${sale.quantity}</td></tr>
           <tr><th>Unit price</th><td>${money(sale.salePrice)}</td></tr>
           <tr><th>Total</th><td>${money(sale.total)}</td></tr>
@@ -955,23 +1056,26 @@ function exportBackup() {
   const blob = new Blob([JSON.stringify(db, null, 2)], { type: "application/json" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = `sizan-pharmacy-backup-${todayISO()}.json`;
+  link.download = `pharmacy-manager-backup-${todayISO()}.json`;
   link.click();
   URL.revokeObjectURL(link.href);
 }
 
-function restoreBackup(file) {
+async function restoreBackup(file) {
   if (!requireAdmin() || !file) return;
+  if (!usingLocalFallback) {
+    alert("Restore is only enabled in local fallback mode. For the live database, import data from the Supabase dashboard.");
+    return;
+  }
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     try {
       const parsed = JSON.parse(reader.result);
       ["categories", "companies", "suppliers", "customers", "medicines", "batches", "purchases", "sales"].forEach((key) => {
         if (!Array.isArray(parsed[key])) throw new Error(`Missing ${key}`);
       });
       db = parsed;
-      saveData();
-      renderAll();
+      await refreshAfterWrite();
       alert("Backup restored successfully.");
     } catch (error) {
       alert(`Invalid backup file: ${error.message}`);
@@ -1039,27 +1143,60 @@ function startBarcodeScan(inputId) {
     });
 }
 
+async function signIn(email, password) {
+  if (!supabaseClient) {
+    usingLocalFallback = true;
+    currentUser = { email: "local@fallback" };
+    currentProfile = { name: "Local Admin", role: "admin" };
+    db = loadLocalData();
+    return;
+  }
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) throw new Error(error.message);
+  currentUser = data.user;
+  const profile = await expectSupabase(supabaseClient.from("profiles").select("*").eq("id", data.user.id).single(), "Could not load user profile");
+  currentProfile = profile;
+  usingLocalFallback = false;
+  await loadRemoteData();
+}
+
+async function signOut() {
+  if (supabaseClient && !usingLocalFallback) await supabaseClient.auth.signOut();
+  currentUser = null;
+  currentProfile = null;
+  db = emptyData();
+}
+
+function setSignedInUi() {
+  $("#current-role").textContent = `${currentProfile.name} (${currentProfile.role})`;
+  $("#login-screen").classList.add("hidden");
+  $("#app-shell").classList.remove("hidden");
+  renderAll();
+}
+
+function setSignedOutUi() {
+  $("#login-email").value = "";
+  $("#login-password").value = "";
+  $("#app-shell").classList.add("hidden");
+  $("#login-screen").classList.remove("hidden");
+}
+
 function bindEvents() {
-  $("#login-form").addEventListener("submit", (event) => {
+  $("#login-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    const role = $("#login-role").value;
-    const pin = $("#login-pin").value;
-    if ((role === "admin" && pin === ADMIN_PIN) || (role === "staff" && pin === STAFF_PIN)) {
-      currentUser = role;
-      $("#current-role").textContent = role === "admin" ? "Admin" : "Staff";
-      $("#login-screen").classList.add("hidden");
-      $("#app-shell").classList.remove("hidden");
-      renderAll();
-      return;
+    $("#login-error").textContent = "Signing in...";
+    try {
+      await signIn($("#login-email").value.trim(), $("#login-password").value);
+      $("#login-error").textContent = "";
+      setSignedInUi();
+    } catch (error) {
+      $("#login-error").textContent = error.message;
     }
-    $("#login-error").textContent = "Invalid role or PIN.";
   });
 
-  $("#logout-button").addEventListener("click", () => {
-    currentUser = null;
-    $("#login-pin").value = "";
-    $("#app-shell").classList.add("hidden");
-    $("#login-screen").classList.remove("hidden");
+  $("#logout-button").addEventListener("click", async () => {
+    await signOut();
+    setSignedOutUi();
   });
 
   $("#main-nav").addEventListener("click", (event) => {
@@ -1069,29 +1206,29 @@ function bindEvents() {
 
   $("#global-search").addEventListener("input", renderAll);
   $("#print-button").addEventListener("click", () => window.print());
-  $("#medicine-form").addEventListener("submit", handleMedicineSubmit);
-  $("#purchase-form").addEventListener("submit", handlePurchaseSubmit);
-  $("#sale-form").addEventListener("submit", handleSaleSubmit);
+  $("#medicine-form").addEventListener("submit", (event) => handleMedicineSubmit(event).catch((error) => alert(error.message)));
+  $("#purchase-form").addEventListener("submit", (event) => handlePurchaseSubmit(event).catch((error) => alert(error.message)));
+  $("#sale-form").addEventListener("submit", (event) => handleSaleSubmit(event).catch((error) => alert(error.message)));
   $("#category-form").addEventListener("submit", (event) => {
     event.preventDefault();
-    upsertNamed("categories", "category", "cat", event.currentTarget);
+    upsertNamed("categories", "categories", "category", "cat", event.currentTarget).catch((error) => alert(error.message));
   });
   $("#company-form").addEventListener("submit", (event) => {
     event.preventDefault();
-    upsertNamed("companies", "company", "com", event.currentTarget);
+    upsertNamed("companies", "companies", "company", "com", event.currentTarget).catch((error) => alert(error.message));
   });
   $("#supplier-form").addEventListener("submit", (event) => {
     event.preventDefault();
-    upsertPerson("suppliers", "supplier", "sup", event.currentTarget);
+    upsertPerson("suppliers", "suppliers", "supplier", "sup", event.currentTarget).catch((error) => alert(error.message));
   });
   $("#customer-form").addEventListener("submit", (event) => {
     event.preventDefault();
-    upsertPerson("customers", "customer", "cus", event.currentTarget);
+    upsertPerson("customers", "customers", "customer", "cus", event.currentTarget).catch((error) => alert(error.message));
   });
   $("#refresh-reports").addEventListener("click", renderReports);
   $("#report-month").addEventListener("change", renderReports);
   $("#export-backup").addEventListener("click", exportBackup);
-  $("#restore-file").addEventListener("change", (event) => restoreBackup(event.target.files[0]));
+  $("#restore-file").addEventListener("change", (event) => restoreBackup(event.target.files[0]).catch((error) => alert(error.message)));
 
   document.addEventListener("click", (event) => {
     const target = event.target;
@@ -1111,45 +1248,45 @@ function bindEvents() {
       renderMedicines();
     }
     if (deleteMedicine) {
-      deleteFrom("medicines", deleteMedicine.dataset.deleteMedicine, () =>
+      deleteFrom("medicines", "medicines", deleteMedicine.dataset.deleteMedicine, () =>
         db.batches.some((batch) => batch.medicineId === deleteMedicine.dataset.deleteMedicine)
-      );
+      ).catch((error) => alert(error.message));
     }
     if (editCategory) {
       editing.category = editCategory.dataset.editCategory;
       renderMasters();
     }
     if (deleteCategory) {
-      deleteFrom("categories", deleteCategory.dataset.deleteCategory, () =>
+      deleteFrom("categories", "categories", deleteCategory.dataset.deleteCategory, () =>
         db.medicines.some((medicine) => medicine.categoryId === deleteCategory.dataset.deleteCategory)
-      );
+      ).catch((error) => alert(error.message));
     }
     if (editCompany) {
       editing.company = editCompany.dataset.editCompany;
       renderMasters();
     }
     if (deleteCompany) {
-      deleteFrom("companies", deleteCompany.dataset.deleteCompany, () =>
+      deleteFrom("companies", "companies", deleteCompany.dataset.deleteCompany, () =>
         db.medicines.some((medicine) => medicine.companyId === deleteCompany.dataset.deleteCompany)
-      );
+      ).catch((error) => alert(error.message));
     }
     if (editSupplier) {
       editing.supplier = editSupplier.dataset.editSupplier;
       renderPeople();
     }
     if (deleteSupplier) {
-      deleteFrom("suppliers", deleteSupplier.dataset.deleteSupplier, () =>
+      deleteFrom("suppliers", "suppliers", deleteSupplier.dataset.deleteSupplier, () =>
         db.purchases.some((purchase) => purchase.supplierId === deleteSupplier.dataset.deleteSupplier)
-      );
+      ).catch((error) => alert(error.message));
     }
     if (editCustomer) {
       editing.customer = editCustomer.dataset.editCustomer;
       renderPeople();
     }
     if (deleteCustomer) {
-      deleteFrom("customers", deleteCustomer.dataset.deleteCustomer, () =>
+      deleteFrom("customers", "customers", deleteCustomer.dataset.deleteCustomer, () =>
         db.sales.some((sale) => sale.customerId === deleteCustomer.dataset.deleteCustomer)
-      );
+      ).catch((error) => alert(error.message));
     }
     if (target.id === "cancel-medicine-edit") {
       editing.medicine = null;
@@ -1174,4 +1311,3 @@ function bindEvents() {
 }
 
 bindEvents();
-renderAll();

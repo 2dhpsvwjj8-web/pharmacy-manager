@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Sizan Pharmacy Manager</title>
+    <title>Pharmacy Manager</title>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
@@ -13,21 +13,18 @@
           <div class="brand-mark">Rx</div>
           <div>
             <p class="eyebrow">Pharmacy operations</p>
-            <h1>Sizan Pharmacy Manager</h1>
+            <h1>Pharmacy Manager</h1>
           </div>
         </div>
         <p class="login-copy">Manage medicines, batches, purchases, sales, suppliers, customers, alerts, invoices, and reports from one mobile-friendly workspace.</p>
         <form id="login-form" class="login-form">
           <label>
-            User role
-            <select id="login-role">
-              <option value="admin">Admin</option>
-              <option value="staff">Staff</option>
-            </select>
+            Email
+            <input id="login-email" type="email" autocomplete="username" placeholder="admin@yourpharmacy.com" required>
           </label>
           <label>
-            PIN
-            <input id="login-pin" type="password" inputmode="numeric" placeholder="Admin: 1234, Staff: 0000" required>
+            Password
+            <input id="login-password" type="password" autocomplete="current-password" placeholder="Your Supabase user password" required>
           </label>
           <button class="primary-button" type="submit">Sign in</button>
           <p id="login-error" class="form-error" aria-live="polite"></p>
@@ -40,7 +37,7 @@
         <div class="sidebar-brand">
           <div class="brand-mark">Rx</div>
           <div>
-            <strong>Sizan Pharmacy</strong>
+            <strong>Pharmacy Manager</strong>
             <span id="current-role">Admin</span>
           </div>
         </div>
@@ -267,6 +264,7 @@
       </div>
     </template>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js"></script>
   </body>
 </html>
